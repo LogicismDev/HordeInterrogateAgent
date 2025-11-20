@@ -36,7 +36,7 @@ interrogation_processor = CLIPProcessor.from_pretrained("openai/clip-vit-large-p
 interrogation_model = CLIPModel.from_pretrained("openai/clip-vit-large-patch14").to(device)
 
 def load_interrogation_lists():
-    path = path("ranking_lists")
+    path = Path("ranking_lists")
     groups: Dict[str, List[str]] = {}
 
     for file in root.glob("*.txt"):
