@@ -39,7 +39,7 @@ def load_interrogation_lists():
     path = Path("ranking_lists")
     groups: Dict[str, List[str]] = {}
 
-    for file in root.glob("*.txt"):
+    for file in path.glob("*.txt"):
         with file.open("r", encoding="utf-8") as f:
             lines = [
                 line.strip()
