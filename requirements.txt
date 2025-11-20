@@ -1,0 +1,10 @@
+torch
+transformers
+diffusers
+timm
+numpy<2.0
+Pillow
+requests
+Flask
+rembg[cpu]
+pybase64
