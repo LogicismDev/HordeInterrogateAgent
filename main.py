@@ -110,7 +110,7 @@ def interrogate_image(url):
 
     file_results: List[Tuple[str, float]] = []
     for idx, p in zip(top_indices.tolist(), top_probs.tolist()):
-        files_results.append((prompts[idx], float(p)))
+        file_results.append((prompts[idx], float(p)))
 
     results[group_name] = file_results
 
