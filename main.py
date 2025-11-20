@@ -53,6 +53,8 @@ def load_interrogation_lists():
 
     return groups
 
+interrogation_lists = load_interrogation_lists()
+
 def strip_background_image(url):
     resp = requests.get(url, headers=headers)
     resp.raise_for_status()
@@ -76,7 +78,7 @@ def interrogate_image(url):
 
     results: Dict[str, List[Tuple[str, float]]] = {}
 
-    for group_name, prompts in groups.items():
+    for group_name, prompts in interrogation_lists.items():
         if not prompts:
             continue
     
