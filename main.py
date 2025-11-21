@@ -71,7 +71,7 @@ def strip_background_image(url):
     del session
     return output
 
-def interrogate_image(url: str) -> Dict[str, List[Tuple[str, float]]]:
+def interrogate_image(url):
     resp = requests.get(url, headers=headers)
     resp.raise_for_status()
 
