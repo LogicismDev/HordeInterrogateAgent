@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 
-import traceback
-import logging
 import os
 from pathlib import Path
 import argparse
@@ -212,8 +210,6 @@ def interrogate_endpoint():
             }
         })
     except Exception as e:
-        tb_str = traceback.format_exc()  # full traceback as a string
-        logger.error("Unhandled exception in /interrogate:\n%s", tb_str)
         return jsonify({"error": str(e)}), 500
 
 @app.route("/stripbackground", methods=["POST"])
