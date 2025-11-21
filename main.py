@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import traceback
+import logging
 import os
 from pathlib import Path
 import argparse
@@ -79,52 +81,40 @@ def interrogate_image(url):
 
     results: Dict[str, List[Tuple[str, float]]] = {}
 
-    # Loop per file / group
     for group_name, prompts in interrogation_lists.items():
         if not prompts:
             continue
+    
+    all_logits = []
 
-        all_logits = []
+    for start in range(0, len(prompts), 64):
+        end = start + 64
+        batch_texts = prompts[start:end]
 
-        # Batch prompts for this group
-        for start in range(0, len(prompts), 64):
-            end = start + 64
-            batch_texts = prompts[start:end]
+        inputs = interrogation_processor(
+            text=batch_texts,
+            images=image,
+            return_tensors="pt",
+            padding=True,
+        ).to(device)
 
-            inputs = interrogation_processor(
-                text=batch_texts,
-                images=image,
-                return_tensors="pt",
-                padding=True,
-            ).to(device)
+        with torch.no_grad():
+            outputs = interrogation_model(**inputs)
+            logits = outputs.logits_per_image
+            all_logits.append(logits.cpu())
+    
+    logits_file = torch.cat(all_logits, dim=1)[0]
 
-            with torch.no_grad():
-                outputs = model(**inputs)
-                logits = outputs.logits_per_image  # shape [1, batch_size]
-                all_logits.append(logits.cpu())
+    probs = logits_file.softmax(dim=-1)
 
-        # If something weird happened and there were no logits for this group
-        if not all_logits:
-            continue
+    k = min(5, len(prompts))
+    top_probs, top_indices = torch.topk(probs, k=k)
 
-        logits_file = torch.cat(all_logits, dim=1)[0]  # [num_prompts]
-        probs = logits_file.softmax(dim=-1)
+    file_results: List[Tuple[str, float]] = []
+    for idx, p in zip(top_indices.tolist(), top_probs.tolist()):
+        file_results.append((prompts[idx], float(p)))
 
-        # Safeguard: if for some reason len(prompts) != probs.numel(), fix k
-        num_scores = probs.numel()
-        num_prompts = len(prompts)
-        k = min(5, num_scores, num_prompts)
-        if k <= 0:
-            continue
-
-        top_probs, top_indices = torch.topk(probs, k=k)
-
-        file_results: List[Tuple[str, float]] = []
-        for idx, p in zip(top_indices.tolist(), top_probs.tolist()):
-            # idx is guaranteed < num_scores; we also guard with num_prompts above
-            file_results.append((prompts[idx], float(p)))
-
-        results[group_name] = file_results
+    results[group_name] = file_results
 
     return results
 
@@ -222,6 +212,8 @@ def interrogate_endpoint():
             }
         })
     except Exception as e:
+        tb_str = traceback.format_exc()  # full traceback as a string
+        logger.error("Unhandled exception in /interrogate:\n%s", tb_str)
         return jsonify({"error": str(e)}), 500
 
 @app.route("/stripbackground", methods=["POST"])
