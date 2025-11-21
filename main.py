@@ -50,7 +50,7 @@ def load_interrogation_lists():
         if not lines:
             continue
 
-        groups[path.stem] = lines
+        groups[file.stem] = lines
 
     return groups
 
@@ -82,37 +82,45 @@ def interrogate_image(url):
     for group_name, prompts in interrogation_lists.items():
         if not prompts:
             continue
-    
-    all_logits = []
 
-    for start in range(0, len(prompts), 64):
-        end = start + 64
-        batch_texts = prompts[start:end]
+        all_logits = []
 
-        inputs = interrogation_processor(
-            text=batch_texts,
-            images=image,
-            return_tensors="pt",
-            padding=True,
-        ).to(device)
+        for start in range(0, len(prompts), 64):
+            end = start + 64
+            batch_texts = prompts[start:end]
 
-        with torch.no_grad():
-            outputs = interrogation_model(**inputs)
-            logits = outputs.logits_per_image
-            all_logits.append(logits.cpu())
-    
-    logits_file = torch.cat(all_logits, dim=1)[0]
+            inputs = interrogation_processor(
+                text=batch_texts,
+                images=image,
+                return_tensors="pt",
+                padding=True,
+            ).to(device)
 
-    probs = logits_file.softmax(dim=-1)
+            with torch.no_grad():
+                outputs = interrogation_model(**inputs)
+                logits = outputs.logits_per_image  # [1, batch_size]
+                all_logits.append(logits.cpu())
 
-    k = min(5, len(prompts))
-    top_probs, top_indices = torch.topk(probs, k=k)
+        if not all_logits:
+            continue
 
-    file_results: List[Tuple[str, float]] = []
-    for idx, p in zip(top_indices.tolist(), top_probs.tolist()):
-        file_results.append((prompts[idx], float(p)))
+        logits_file = torch.cat(all_logits, dim=1)[0]  # [num_prompts]
+        probs = logits_file.softmax(dim=-1)
 
-    results[group_name] = file_results
+        # Be safe: never ask for more than we have
+        num_scores = probs.numel()
+        num_prompts = len(prompts)
+        k = min(5, num_scores, num_prompts)
+        if k <= 0:
+            continue
+
+        top_probs, top_indices = torch.topk(probs, k=k)
+
+        file_results: List[Tuple[str, float]] = []
+        for idx, p in zip(top_indices.tolist(), top_probs.tolist()):
+            file_results.append((prompts[idx], float(p)))
+
+        results[group_name] = file_results
 
     return results
 
